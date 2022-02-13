@@ -42,7 +42,7 @@ RangeFloatProperty::RangeFloatProperty(const QString &name, float fallback_value
 {
 	setShouldBeSaved(false);
 	Property::setValue("");
-	setValue(fallback_value);
+	RangeFloatProperty::setValue(fallback_value);
 }
 
 bool RangeFloatProperty::setValue(const QVariant &new_value)
@@ -86,7 +86,7 @@ void RangeFloatProperty::load(const Config &config)
 	FloatProperty::load(config);
 }
 
-QWidget *RangeFloatProperty::createEditor(QWidget *parent, const QStyleOptionViewItem &option)
+QWidget *RangeFloatProperty::createEditor(QWidget *parent, const QStyleOptionViewItem & /*option*/)
 {
 	// use own editor to allow for empty input
 	QLineEdit *editor = new QLineEdit(parent);

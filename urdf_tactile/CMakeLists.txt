@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1.3)
-project(urdf_tactile VERSION 0.1)
+project(urdf_tactile)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 14)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(Boost REQUIRED system)
+find_package(urdfdom REQUIRED)
 find_package(catkin REQUIRED pluginlib urdf)
 
 ###################################
@@ -26,12 +27,8 @@ catkin_package(
   DEPENDS Boost
 )
 
-#############
-## sub dir ##
-#############
 include_directories(SYSTEM ${Boost_INCLUDE_DIR})
-
-include_directories(include ${catkin_INCLUDE_DIRS})
+include_directories(SYSTEM include ${catkin_INCLUDE_DIRS})
 file(GLOB_RECURSE PROJECT_INCLUDES *.h)
 
 add_subdirectory(src)
