@@ -34,10 +34,10 @@
 
 namespace tactile {
 
-class Merger
+class ContactForceEstimator
 {
 public:
-	explicit Merger(const std::string &tf_prefix = "");
+	explicit ContactForceEstimator(const std::string &tf_prefix = "");
 
 	void init(const std::string &param = "robot_description");
 
