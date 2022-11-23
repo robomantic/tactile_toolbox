@@ -10,6 +10,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <numeric>
 #include <exception>
 #include <yaml-cpp/yaml.h>
 
@@ -225,12 +226,18 @@ void TactileStateCalibrator::init(const std::string &calib_filename)
 		return;
 	}
 	ROS_DEBUG_STREAM("mapping loaded");
-	// initialize publisher
+	
+	tare_requested_ = false;
+	tare_recordings_count_ = 0;
+	// initialize publishers
 	tactile_pub_ = nh_.advertise<tactile_msgs::TactileState>("out_tactile_states", 5);
+	tare_offset_pub_ = nh_.advertise<sensor_msgs::ChannelFloat32>("out_tare_offset", 5);
 
 	// initialize subscriber
 	tactile_sub_ = nh_.subscribe("in_tactile_states", 5, &TactileStateCalibrator::tactile_state_cb, this);
 	ROS_INFO("tactile_state_calibrator initialized");
+	// initialize service
+	tare_srv_ = nh_.advertiseService("tare_request", &TactileStateCalibrator::tare_cb, this);
 }
 
 float TactileStateCalibrator::map(float val, const std::shared_ptr<Calibration> &calib)
@@ -252,6 +259,11 @@ void TactileStateCalibrator::tactile_state_cb(const tactile_msgs::TactileStateCo
 			// same function as in the previous glove console
 			std::transform(msg->sensors[i].values.begin(), msg->sensors[i].values.end(), out_msg.sensors[i].values.begin(),
 			               std::bind(&tactile::Calibration::map, single_calib_.get(), std::placeholders::_1));
+			// do an additional offset transformation unless tare_offsets_ is empty();
+			if (tare_offsets_.size() == out_msg.sensors[i].values.size()) {
+				std::transform(out_msg.sensors[i].values.begin(), out_msg.sensors[i].values.end(), tare_offsets_.begin(),
+				               out_msg.sensors[i].values.begin(), [](float val, float offset) -> float { return val - offset; });
+			}
 		} else  // if more than one calibmap for this sensor
 		{
 			// TODO Guillaume: support a more advanced scheme with taxel start and end, and different calib for different
@@ -260,16 +272,69 @@ void TactileStateCalibrator::tactile_state_cb(const tactile_msgs::TactileStateCo
 				// binary operator, first argument is the value (of that taxel), second is the pointer to which map to use
 				// (for that taxel)
 				std::transform(msg->sensors[i].values.begin(), msg->sensors[i].values.end(), calibs_.begin(),
-				               out_msg.sensors[i].values.begin(),
-				               std::bind(&TactileStateCalibrator::map, this, std::placeholders::_1, std::placeholders::_2));
+					       out_msg.sensors[i].values.begin(),
+					       std::bind(&TactileStateCalibrator::map, this, std::placeholders::_1, std::placeholders::_2));
+				// do an additional offset transformation unless tare_offsets_ is empty();
+				if (tare_offsets_.size() == out_msg.sensors[i].values.size()) {
+					// binary operator, first argument is the value of that taxel, second is the offset value for that taxel
+					std::transform(out_msg.sensors[i].values.begin(), out_msg.sensors[i].values.end(), tare_offsets_.begin(),
+					               out_msg.sensors[i].values.begin(),
+					              [](float val, float offset) -> float { return val - offset; });
+				}
 			} else {
 				ROS_WARN_STREAM_ONCE("Only " << calibs_.size() << " maps found, " << msg->sensors[i].values.size()
 				                             << " expected");
 			}
 			// else no calib
 		}
+		// process tare
+		if (tare_requested_) {
+			if (tare_recordings_count_ >= DEFAULT_TARE_RECORDINDS) {
+				if (i == 0) {
+					tare_requested_ = false;
+					tare_recordings_count_ = 0;
+					ROS_INFO_STREAM("tared");
+					tare_offsets_.resize(out_msg.sensors[i].values.size());
+					// compute tare values
+					std::transform(tare_recordings_.begin(), tare_recordings_.end(), tare_offsets_.begin(),
+					               [](float val) -> float { return val/(float)DEFAULT_TARE_RECORDINDS; });
+					// reset recordings
+					tare_recordings_.clear();
+					// publish tare offsets
+					sensor_msgs::ChannelFloat32 tare_msg;
+					tare_msg.values = tare_offsets_;
+					tare_offset_pub_.publish(tare_msg);
+				}
+			} else {
+				// store values (how to handle multiple sensors ? one tare per sensor per value ?
+				// now only handle a single sensor since we also use the same calib map for all sensors
+				if (i == 0) {
+					if (tare_recordings_.size() != out_msg.sensors[i].values.size())
+						tare_recordings_.resize(out_msg.sensors[i].values.size(), .0);
+					std::transform(out_msg.sensors[i].values.begin(), out_msg.sensors[i].values.end(),
+					               tare_recordings_.begin(),
+					               tare_recordings_.begin(),
+					               [](float val, float acc) -> float { return acc + val; });
+					tare_recordings_count_++;
+				}
+			}
+		}
 	}
 	tactile_pub_.publish(out_msg);
+}
+
+bool TactileStateCalibrator::tare_cb(std_srvs::Trigger::Request& req,
+                                     std_srvs::Trigger::Response& resp)
+{
+	if (tare_requested_) {
+		resp.success = false;
+		resp.message = "tare ongoing";
+	} else {
+		resp.success = true;
+		// start tare
+		tare_requested_ = true;
+	}
+	return true;
 }
 
 TactileStateCalibrator::~TactileStateCalibrator()
