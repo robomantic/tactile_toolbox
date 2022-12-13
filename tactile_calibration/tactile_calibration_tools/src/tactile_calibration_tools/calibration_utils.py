@@ -7,7 +7,11 @@ from collections import OrderedDict
 import matplotlib.pyplot as plt
 from datetime import datetime
 import os
+from tactile_calibration_tools.mapping_utils import *
 
+
+REF_FLAT_THRESHOLD = 0.3  # in newton (30 gram) accepatable variation to find the flat part of the ref
+CHANGE_DETECT_THRESH = 4  # 5 unit of velocity positive or negative
 
 def find_inflection_index(x, change_detection_threshold=4):
     direction = 0  # check for any change
@@ -149,6 +153,45 @@ def calibrate_ref(ref_vec, ref_ratio, ref_offset, user_tare=None, flatness_thres
 
     return ref_cal_tare
 
+
+def process(bagfilename, topic, calib_channel, data_channel, ref_channel, ref_ratio, ref_offset, ref_tare_val, ref_is_raw, input_range_max, segments, no_extrapolation, mapping_file, output_csv, plot):
+
+    # read the bag file
+    [sensor_name, ref_raw_vec, raw_vec] = read_calib(bagfilename, topic, data_channel, ref_channel, input_range_max)
+    if (len(raw_vec) == 0 or len(ref_raw_vec) == 0):
+        print("no data retrieved, check topic name ")
+        return -1
+
+    # process the data
+    print("Processing data...")
+    # 3. Offline Lookuptable generation
+    # convert the data
+    raw = np.array(raw_vec)
+    # process ref if needed
+    ref_newton_tare = calibrate_ref(ref_raw_vec, ref_ratio, ref_offset, ref_tare_val, REF_FLAT_THRESHOLD, ref_is_raw)
+
+    # find the sections in which pressure increases/decreases
+    print(" Finding push/release")
+    [inc_idx, dec_idx] = get_push_release(raw, ref_newton_tare, CHANGE_DETECT_THRESH, plot)
+    if inc_idx is not None:
+        [inc, dec] = generate_lookup(raw, ref_newton_tare, inc_idx, dec_idx, input_range_max, plot)
+        if len(inc) == 0:
+            print(" failed to generate lookup")
+            return -1
+    else:
+        print(" failed to extract push/release")
+        return -1
+    print(" Fitting the data and extracting a", segments, " segment piece-wise-linear calib")
+    # process only increasing
+    mapping_dict = generate_mapping_pwl(inc[0], inc[1], input_range_max,
+                                        calib_channel, segments, no_extrapolation, plot)
+
+    # 6. Save
+    # a    Save Lookuptable and-or Model in TaxelCalibrationMapping file.
+    print("Preparing mapping for cell ", calib_channel)
+    save_mapping(mapping_dict, calib_channel, sensor_name, mapping_file, output_csv)
+
+    return 0
 
 def get_push_release(raw, ref, change_detect_threshold, doplot=False):
     # TODO Guillaume : also look at the range of ref data to not get a decreasing force at the end of the increasing raw data
