@@ -403,7 +403,7 @@ if __name__ == "__main__":
                                 state = RecordingState.END
                             if user_choice == 'k':
                                 state = RecordingState.NEXTCHANNEL
-                            if user_choice == 'k':
+                            if user_choice == 't':
                                 state = RecordingState.TARE
                     else:
                         print("reference cannot be calibrated, so will not be tared")
