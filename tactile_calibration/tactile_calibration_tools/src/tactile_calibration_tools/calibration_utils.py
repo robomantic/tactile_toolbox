@@ -414,10 +414,15 @@ def read_calib(bagfilename, user_topic, data_channel, ref_channel, input_range_m
 def generate_mapping_pwl(x, y, input_range_max, calib_channel, seg=4, no_extrapolation=False, doplot=False):
     try:
         import pwlf
+    except ModuleNotFoundError:
+        print('Missing PWL functions. Ensure that it is installed according to the instructions here: \n'
+                  '  https://github.com/cjekel/piecewise_linear_fit_py#installation')
+        exit(-1)  # raise makes the message not appear
+        
     except ImportError as e:
-        e.args = (e.args[0] + '. Ensure that it is installed according to the instructions here: \n'
+        print('Ensure that it is installed according to the instructions here: \n'
                   '  https://github.com/cjekel/piecewise_linear_fit_py#installation',)
-        raise
+        exit(-1)  # raise makes the message not appear
 
     xs = np.array(x)
     ys = np.array(y)
