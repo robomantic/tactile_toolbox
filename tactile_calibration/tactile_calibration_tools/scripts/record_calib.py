@@ -44,6 +44,7 @@ DEFAULT_KEY_TIMEOUT = 2  # 2 seconds
 DEFAULT_RECORDING_DURATION = 10  # 30 seconds
 MAX_MESSAGE_STORED = 100000  # 100 seconds at 1 kHz of data rate
 DEFAULT_TARE_RECORDINGS = 1000
+DEFAULT_SEGMENTS = 5
 
 # prepare storage
 global raw_topic_init, recording_channel, state, args, msgs, ref_topic_init, raw_vec, raw_previous_vec, ref_raw_previous_vec, tare_vec, saved
@@ -77,7 +78,8 @@ class RecordingState(Enum):
     RECORD = 6
     PROCESS = 7
     SAVE = 8
-    END = 9
+    CALIBRATE = 9
+    END = 10
 
 # callback for single topic
 
@@ -330,6 +332,7 @@ if __name__ == "__main__":
                         help="input resolution in bits")
     parser.add_argument("--repetition", type=int, default=DEFAULT_REPETITION,
                         help="number of repetitions awaited for the push/release movement")
+    parser.add_argument("--record_only",  action="store_true", help="performs only all calibration recordings, keep calibration processing separate")
     args = parser.parse_args()
 
     rospy.init_node('tactile_calibration_recorder', anonymous=True)
@@ -663,23 +666,82 @@ if __name__ == "__main__":
                 saved = save_data(save_filename)
 
                 if saved:
+                    if detected_channel is not None:
+                        processed_channels[detected_channel] = save_filename
                     if channel_list is not None:
                         # remove is was in list
                         if detected_channel in channel_list:
                             channel_list.remove(detected_channel)
+                    # check if calibrate should occur now
+                    if args.record_only is not True:
+                        # switch to calibrate state
+                        state = RecordingState.CALIBRATE
 
             else:
                 print("No data to save or No channel selected")
+            
+            # if still in SAVE state, ask if wants to end loop
+            if state == RecordingState.SAVE:
+                if not quit_request:
+                    saved = False
+                    reset_recording()
+                    state = RecordingState.NEXTCHANNEL
+                else:
+                    saved = True  # even if not saved, we need to quit now
+                    state = RecordingState.END
+            # else we should go to calibrate now
+
+        # State Calibrate 
+        if state == RecordingState.CALIBRATE:
+            # check if filename exist for the detected channel
+            process_filename = None
             if detected_channel is not None:
-                processed_channels[detected_channel] = save_filename
-            # loop
-            if not quit_request:
-                saved = False
-                reset_recording()
-                state = RecordingState.NEXTCHANNEL
+                if processed_channels[detected_channel] is not None:
+                    process_filename = processed_channels[detected_channel]
             else:
-                saved = True  # even if not saved, we need to quit now
-                state = RecordingState.END
+                print ("No channel detected, cannot calibrate")
+                state == RecordingState.NEXTCHANNEL
+                            
+            # rosrun tactile_calibration_tools generate_calib.py calib_\# /left/TactileGlove --plot
+            if process_filename is not None:
+                calib_channel = detected_channel
+                data_channel = 0
+                ref_channel = 1
+                tare_val = tare
+                input_resolution = DEFAULT_INPUT_RESOL
+                input_range_max = input_range_max = 2**input_resolution
+                segments = DEFAULT_SEGMENTS
+                no_extrapolation = False
+                mapping_file = None
+                output_csv = False
+                show_plot = True # even if args.plot is false, as visual inspection is the only way to be satisfied with the calib
+                
+                # [calib_channels, data_channel, ref_channel] = get_channels(args.data_channel, , args.bagfilename)
+                process(process_filename,  args.raw_topic, calib_channel, data_channel,
+                    ref_channel , args.ref_ratio, args.ref_offset, tare_val, False,
+                    input_range_max, segments, no_extrapolation, mapping_file, output_csv, show_plot)
+                
+                if show_plot:
+                    print("close plot windows when ready")
+                    plt.show(block=True)
+
+                # satisfying result
+                print ("Are you satisfied with the calibration result ? [y]/n")
+                if user_yesno(default=True):
+                    state = RecordingState.NEXTCHANNEL
+                else:
+                    user_choice = user_menu({'r': "restart recording", 'd': "detect a new cell", 'q': "quit now"})
+                    if user_choice == 'q':
+                        state = RecordingState.END
+                    if user_choice == 'd':
+                        state = RecordingState.DETECT
+                        raw_previous_vec = []
+                        ref_raw_previous_vec = []
+                    if user_choice == 'r':
+                        print("restarting recording")
+                        state = RecordingState.RECORD
+            # else should go to NEXTCHANNEL
+              
 
         # State End
         if state == RecordingState.END:
