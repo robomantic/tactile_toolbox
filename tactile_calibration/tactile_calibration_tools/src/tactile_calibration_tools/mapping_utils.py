@@ -93,7 +93,7 @@ def save_mapping(mapping_dict, calib_channel, sensor_name, mapping_file=None, ou
         # read previous data if exists
         with open(mapping_filename, 'r') as f:
             # parse yaml
-            previous_calib = yaml.load(f)
+            previous_calib = yaml.load(f, Loader=yaml.SafeLoader)
             if previous_calib is not None:
                 # check if previous calib is single calib format or not
                 if "calib" in previous_calib:
@@ -119,7 +119,7 @@ def save_mapping(mapping_dict, calib_channel, sensor_name, mapping_file=None, ou
         # merge calib if needed
         if calib is None:  # no merge possible, or file empty then just write
             newcalib["calib"] = [{'sensor_name': sensor_name, 'type': 'PWL',
-                                  'idx_range':  flowmap([calib_channel]), "values": mapping_dict}]
+                                  'idx_range':  flowmap([int(calib_channel)]), "values": mapping_dict}]
         else:  # merge needed
             # TODO insert the new channel at the correct place
             # TODO maybe allow to insert this calib for more than calib_channel
@@ -144,11 +144,11 @@ def save_mapping(mapping_dict, calib_channel, sensor_name, mapping_file=None, ou
                                              'idx_range':  flowmap(cal["idx_range"]), 'values': cal["values"]})
             # append new calib
             newcalib["calib"].append({'sensor_name': sensor_name, 'type': 'PWL',
-                                     'idx_range': flowmap([calib_channel]), 'values': mapping_dict})
+                                     'idx_range': flowmap([int(calib_channel)]), 'values': mapping_dict})
 
-    except IOError:  # file does not exist, create it
+    except FileNotFoundError:  # file does not exist, create it
         newcalib["calib"] = [{'sensor_name': sensor_name, 'type': 'PWL',
-                              'idx_range': flowmap([calib_channel]), 'values': mapping_dict}]
+                              'idx_range': flowmap([int(calib_channel)]), 'values': mapping_dict}]
         pass
     print("Saving mapping to ", mapping_filename)
     with open(mapping_filename, 'w') as f:
