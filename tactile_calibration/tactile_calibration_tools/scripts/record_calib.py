@@ -715,31 +715,49 @@ if __name__ == "__main__":
                 mapping_file = None
                 output_csv = False
                 show_plot = True # even if args.plot is false, as visual inspection is the only way to be satisfied with the calib
-                
-                # [calib_channels, data_channel, ref_channel] = get_channels(args.data_channel, , args.bagfilename)
-                process(process_filename,  args.raw_topic, calib_channel, data_channel,
-                    ref_channel , args.ref_ratio, args.ref_offset, tare_val, False,
-                    input_range_max, segments, no_extrapolation, mapping_file, output_csv, show_plot)
-                
-                if show_plot:
-                    print("close plot windows when ready")
-                    plt.show(block=True)
 
-                # satisfying result
-                print ("Are you satisfied with the calibration result ? [y]/n")
-                if user_yesno(default=True):
-                    state = RecordingState.NEXTCHANNEL
+                # prepare the data from the stored msgs (no re-reading of bagfile here)
+                ref_raw_data = []
+                raw_data = []
+                sensor_names = []
+                warned_size_tactile_vec = False
+                for msg in msgs:
+                    concatenate_raw_ref(msg, ref_raw_data, raw_data, sensor_names, data_channel, ref_channel, input_range_max, warned_size_tactile_vec)
+                # validate the data
+                if (len(raw_data) == 0 or len(ref_raw_data) == 0):
+                    print("no data retrieved, cannot calibrate ")
+                    state == RecordingState.NEXTCHANNEL
                 else:
-                    user_choice = user_menu({'r': "restart recording", 'd': "detect a new cell", 'q': "quit now"})
-                    if user_choice == 'q':
-                        state = RecordingState.END
-                    if user_choice == 'd':
-                        state = RecordingState.DETECT
-                        raw_previous_vec = []
-                        ref_raw_previous_vec = []
-                    if user_choice == 'r':
-                        print("restarting recording")
-                        state = RecordingState.RECORD
+                    # calibrate
+                    mapping_dict = process(ref_raw_data, raw_data, calib_channel, data_channel,
+                                  ref_channel, args.ref_ratio, args.ref_offset, tare_val, False,
+                                  input_range_max, segments, no_extrapolation, show_plot)
+            
+                    if mapping_dict is not None:  # no error
+                        # Have user look at the data
+                        if show_plot:
+                            plt.show(block=False)
+                    
+                        # satisfying result ?
+                        print ("Are you satisfied with the calibration result ? [y]/n")
+                        if user_yesno(default=True):
+                            state = RecordingState.NEXTCHANNEL
+                            # 6. Save
+                            # a    Save Lookuptable and-or Model in TaxelCalibrationMapping file.
+                            print("Adding mapping to file for cell", calib_channel)
+                            save_mapping(mapping_dict, calib_channel, sensor_names[0], mapping_file, output_csv)
+
+                        else:  # not satisfying
+                            user_choice = user_menu({'r': "restart recording", 'd': "detect a new cell", 'q': "quit now"})
+                            if user_choice == 'q':
+                                state = RecordingState.END
+                            if user_choice == 'd':
+                                state = RecordingState.DETECT
+                                raw_previous_vec = []
+                                ref_raw_previous_vec = []
+                            if user_choice == 'r':
+                                print("restarting recording")
+                                state = RecordingState.RECORD
             # else should go to NEXTCHANNEL
               
 

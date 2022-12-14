@@ -154,13 +154,7 @@ def calibrate_ref(ref_vec, ref_ratio, ref_offset, user_tare=None, flatness_thres
     return ref_cal_tare
 
 
-def process(bagfilename, topic, calib_channel, data_channel, ref_channel, ref_ratio, ref_offset, ref_tare_val, ref_is_raw, input_range_max, segments, no_extrapolation, mapping_file, output_csv, plot):
-
-    # read the bag file
-    [sensor_name, ref_raw_vec, raw_vec] = read_calib(bagfilename, topic, data_channel, ref_channel, input_range_max)
-    if (len(raw_vec) == 0 or len(ref_raw_vec) == 0):
-        print("no data retrieved, check topic name ")
-        return -1
+def process(ref_raw_vec, raw_vec, calib_channel, data_channel, ref_channel, ref_ratio, ref_offset, ref_tare_val, ref_is_raw, input_range_max, segments, no_extrapolation, plot):
 
     # process the data
     print("Processing data...")
@@ -177,21 +171,16 @@ def process(bagfilename, topic, calib_channel, data_channel, ref_channel, ref_ra
         [inc, dec] = generate_lookup(raw, ref_newton_tare, inc_idx, dec_idx, input_range_max, plot)
         if len(inc) == 0:
             print(" failed to generate lookup")
-            return -1
+            return None
     else:
         print(" failed to extract push/release")
-        return -1
+        return None
     print(" Fitting the data and extracting a", segments, " segment piece-wise-linear calib")
     # process only increasing
     mapping_dict = generate_mapping_pwl(inc[0], inc[1], input_range_max,
                                         calib_channel, segments, no_extrapolation, plot)
 
-    # 6. Save
-    # a    Save Lookuptable and-or Model in TaxelCalibrationMapping file.
-    print("Preparing mapping for cell ", calib_channel)
-    save_mapping(mapping_dict, calib_channel, sensor_name, mapping_file, output_csv)
-
-    return 0
+    return mapping_dict
 
 def get_push_release(raw, ref, change_detect_threshold, doplot=False):
     # TODO Guillaume : also look at the range of ref data to not get a decreasing force at the end of the increasing raw data
@@ -372,44 +361,46 @@ def get_channels(user_data_channel, user_ref_channel, bagfilename):
                         ref_channel = 1
     return [calib_channel, data_channel, ref_channel]
 
+def concatenate_raw_ref(msg, ref_raw_vec, raw_vec, sensor_names, data_channel, ref_channel, input_range_max=1024, warned_size_tactile_vec=False):
+    # if there is data
+    if len(msg.sensors):
+        if len(sensor_names) == 0:
+            sensor_names.append(msg.sensors[0].name)
+        # warn if no channel provided but data is larger than 2 values
+        if not warned_size_tactile_vec:
+            if len(msg.sensors[0].values) > 2 and not (data_channel and ref_channel):
+                print("# Warning #, data size larger than 2 elements but not both data_channel and ref_channel were given")
+                warned_size_tactile_vec = True
 
+        # validate index are in the range
+        if (ref_channel < len(msg.sensors[0].values) and data_channel < len(msg.sensors[0].values)):
+            if msg.sensors[0].values[data_channel] < input_range_max:
+                # extract the dedicated channels for raw and reference_raw
+                # 2.d    crop saved values to pair of channels [CalibTool;determined taxe]: /TactileGlove/sensors[0]/values[17] and /TactileGlove/sensors[0]/values[determined taxel]
+                ref_raw_vec.append(msg.sensors[0].values[ref_channel])
+                raw_vec.append(msg.sensors[0].values[data_channel])
+            else:  # input range badly chosen
+                print("Data ", msg.sensors[0].values[data_channel],
+                      " is higher than input resolution ", input_range_max)
+                return -1
+        # else drop the data of this message
+    return 0
+    
 def read_calib(bagfilename, user_topic, data_channel, ref_channel, input_range_max=1024):
 
     bag = rosbag.Bag(bagfilename)
     ref_raw_vec = []
     raw_vec = []
     # TODO Guillaume : also handle the sensor name in case there are more than one sensor (like on iObject+)
-    sensor_name = None
+    sensor_names = []
     print("Reading", bagfilename, " looking for ", user_topic, "channel", data_channel, " and ref ", ref_channel)
     warned_size_tactile_vec = False
     for topic, msg, t in bag.read_messages(topics=[user_topic]):
-        # if there is data
-        if len(msg.sensors):
-            if sensor_name is None:
-                sensor_name = msg.sensors[0].name
-            # warn if no channel provided but data is larger than 2 values
-            if not warned_size_tactile_vec:
-                if len(msg.sensors[0].values) > 2 and not (data_channel and ref_channel):
-                    print("# Warning #, data size larger than 2 elements but not both data_channel and ref_channel were given")
-                    warned_size_tactile_vec = True
-
-            # validate index are in the range
-            if (ref_channel < len(msg.sensors[0].values) and data_channel < len(msg.sensors[0].values)):
-                if msg.sensors[0].values[data_channel] < input_range_max:
-                    # extract the dedicated channels for raw and reference_raw
-                    # 2.d    crop saved values to pair of channels [CalibTool;determined taxe]: /TactileGlove/sensors[0]/values[17] and /TactileGlove/sensors[0]/values[determined taxel]
-                    ref_raw_vec.append(msg.sensors[0].values[ref_channel])
-                    raw_vec.append(msg.sensors[0].values[data_channel])
-                else:  # input range badly chosen
-                    print("Data ", msg.sensors[0].values[data_channel],
-                          " is higher than input resolution ", input_range_max)
-                    bag.close()
-                    exit(-1)
-            # else drop the data of this message
+        ret = concatenate_raw_ref(msg, ref_raw_vec, raw_vec, sensor_names, data_channel, ref_channel, input_range_max, warned_size_tactile_vec)
+        if ret == -1:
+            break
     bag.close()
-
-    return [sensor_name, ref_raw_vec, raw_vec]
-
+    return [sensor_names[0], ref_raw_vec, raw_vec]
 
 def generate_mapping_pwl(x, y, input_range_max, calib_channel, seg=4, no_extrapolation=False, doplot=False):
     try:
