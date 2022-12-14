@@ -347,6 +347,18 @@ if __name__ == "__main__":
     if args.ref_ratio and args.ref_offset:
         calibrate_ref = True
 
+    # initialize plots (to be in the main thread for tkinter)
+    # and avoid : Tcl_AsyncDelete: async handler deleted by the wrong thread
+    plt.figure(1)
+    mngr = plt.get_current_fig_manager()
+    mngr.window.geometry('600x400+0+0')
+    plt.figure(2)
+    mngr = plt.get_current_fig_manager()
+    mngr.window.geometry('500x300+0+500')
+    plt.figure(3)
+    mngr = plt.get_current_fig_manager()
+    mngr.window.geometry('500x300+0+800')
+
     # prepare state machine
     state = RecordingState.INIT
     rate = rospy.Rate(20)  # 10hz

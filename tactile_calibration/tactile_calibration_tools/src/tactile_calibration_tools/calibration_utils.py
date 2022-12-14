@@ -4,7 +4,12 @@ import rosbag
 from tactile_msgs.msg import TactileState
 import numpy as np
 from collections import OrderedDict
-import matplotlib.pyplot as plt
+
+#import matplotlib.backends.backend_qt5agg
+import matplotlib
+matplotlib.use('TkAgg')
+from matplotlib import pyplot as plt
+
 from datetime import datetime
 import os
 from tactile_calibration_tools.mapping_utils import *
@@ -215,6 +220,11 @@ def get_push_release(raw, ref, change_detect_threshold, doplot=False):
         plt.xlabel('Samples')
         plt.ylabel('Ref')
         plt.legend(["Reference"])
+        
+      
+        mngr = plt.get_current_fig_manager()
+        #mngr.window.geometry('600x400+0+0')
+    
         plt.show(block=False)
 
     return [inc_idx, dec_idx]
@@ -277,6 +287,10 @@ def generate_lookup(raw, ref, inc_idx, dec_idx, input_range_max, doplot=False):
         plt.ylabel('Ref')
         plt.xlabel('Raw')
         plt.legend(["Pushing", "Releasing"])
+        
+        mngr = plt.get_current_fig_manager()
+        #mngr.window.geometry('500x300+0+400')
+
         plt.show(block=False)
 
     return [[x_inc, y_inc], [x_dec, y_dec]]
@@ -428,7 +442,7 @@ def generate_mapping_pwl(x, y, input_range_max, calib_channel, seg=4, no_extrapo
         x_hat = np.linspace(xs.min(), xs.max(), 100)
         y_hat = pwlf_result.predict(x_hat)
 
-        plt.figure()
+        plt.figure(3)
         plt.clf()
         plt.plot(xs, ys, 'o')
         plt.plot(x_hat, y_hat, '-')
@@ -436,6 +450,10 @@ def generate_mapping_pwl(x, y, input_range_max, calib_channel, seg=4, no_extrapo
         plt.ylabel('Ref')
         plt.xlabel('Raw')
         plt.legend(["Pushing data", "PWL Mapping"])
+
+        mngr = plt.get_current_fig_manager()
+        #mngr.window.geometry('500x300+0+800')
+    
         plt.show(block=False)
 
     # with open('lookup_inc.csv', 'w') as csvfile:
