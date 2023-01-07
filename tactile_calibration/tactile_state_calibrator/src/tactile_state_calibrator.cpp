@@ -226,7 +226,7 @@ void TactileStateCalibrator::init(const std::string &calib_filename)
 		return;
 	}
 	ROS_DEBUG_STREAM("mapping loaded");
-	
+
 	tare_requested_ = false;
 	tare_recordings_count_ = 0;
 	// initialize publishers
@@ -262,7 +262,8 @@ void TactileStateCalibrator::tactile_state_cb(const tactile_msgs::TactileStateCo
 			// do an additional offset transformation unless tare_offsets_ is empty();
 			if (tare_offsets_.size() == out_msg.sensors[i].values.size()) {
 				std::transform(out_msg.sensors[i].values.begin(), out_msg.sensors[i].values.end(), tare_offsets_.begin(),
-				               out_msg.sensors[i].values.begin(), [](float val, float offset) -> float { return val - offset; });
+				               out_msg.sensors[i].values.begin(),
+				               [](float val, float offset) -> float { return val - offset; });
 			}
 		} else  // if more than one calibmap for this sensor
 		{
@@ -272,14 +273,14 @@ void TactileStateCalibrator::tactile_state_cb(const tactile_msgs::TactileStateCo
 				// binary operator, first argument is the value (of that taxel), second is the pointer to which map to use
 				// (for that taxel)
 				std::transform(msg->sensors[i].values.begin(), msg->sensors[i].values.end(), calibs_.begin(),
-					       out_msg.sensors[i].values.begin(),
-					       std::bind(&TactileStateCalibrator::map, this, std::placeholders::_1, std::placeholders::_2));
+				               out_msg.sensors[i].values.begin(),
+				               std::bind(&TactileStateCalibrator::map, this, std::placeholders::_1, std::placeholders::_2));
 				// do an additional offset transformation unless tare_offsets_ is empty();
 				if (tare_offsets_.size() == out_msg.sensors[i].values.size()) {
 					// binary operator, first argument is the value of that taxel, second is the offset value for that taxel
 					std::transform(out_msg.sensors[i].values.begin(), out_msg.sensors[i].values.end(), tare_offsets_.begin(),
 					               out_msg.sensors[i].values.begin(),
-					              [](float val, float offset) -> float { return val - offset; });
+					               [](float val, float offset) -> float { return val - offset; });
 				}
 			} else {
 				ROS_WARN_STREAM_ONCE("Only " << calibs_.size() << " maps found, " << msg->sensors[i].values.size()
@@ -297,7 +298,7 @@ void TactileStateCalibrator::tactile_state_cb(const tactile_msgs::TactileStateCo
 					tare_offsets_.resize(out_msg.sensors[i].values.size());
 					// compute tare values
 					std::transform(tare_recordings_.begin(), tare_recordings_.end(), tare_offsets_.begin(),
-					               [](float val) -> float { return val/(float)DEFAULT_TARE_RECORDINDS; });
+					               [](float val) -> float { return val / (float)DEFAULT_TARE_RECORDINDS; });
 					// reset recordings
 					tare_recordings_.clear();
 					// publish tare offsets
@@ -312,8 +313,7 @@ void TactileStateCalibrator::tactile_state_cb(const tactile_msgs::TactileStateCo
 					if (tare_recordings_.size() != out_msg.sensors[i].values.size())
 						tare_recordings_.resize(out_msg.sensors[i].values.size(), .0);
 					std::transform(out_msg.sensors[i].values.begin(), out_msg.sensors[i].values.end(),
-					               tare_recordings_.begin(),
-					               tare_recordings_.begin(),
+					               tare_recordings_.begin(), tare_recordings_.begin(),
 					               [](float val, float acc) -> float { return acc + val; });
 					tare_recordings_count_++;
 				}
@@ -323,8 +323,7 @@ void TactileStateCalibrator::tactile_state_cb(const tactile_msgs::TactileStateCo
 	tactile_pub_.publish(out_msg);
 }
 
-bool TactileStateCalibrator::tare_cb(std_srvs::Trigger::Request& req,
-                                     std_srvs::Trigger::Response& resp)
+bool TactileStateCalibrator::tare_cb(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &resp)
 {
 	if (tare_requested_) {
 		resp.success = false;
