@@ -19,7 +19,7 @@
 #include <tactile_filters/PieceWiseLinearCalib.h>
 #include <tactile_filters/Calibration.h>
 
-#define DEFAULT_TARE_RECORDINDS	50  // number of samples for tare value computing
+#define DEFAULT_TARE_RECORDINDS 50  // number of samples for tare value computing
 
 class TactileStateCalibrator
 {
@@ -62,8 +62,7 @@ private:
 	/**
 	 * service callback
 	 */
-	bool tare_cb(std_srvs::Trigger::Request& req,
-               std_srvs::Trigger::Response& resp);
+	bool tare_cb(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &resp);
 	/**
 	 * wrapper to call calibration map operator with different calib
 	 */

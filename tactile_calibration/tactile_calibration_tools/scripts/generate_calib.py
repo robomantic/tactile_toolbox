@@ -65,21 +65,22 @@ if __name__ == "__main__":
             print("### Processing file", calib_channels[calib_channel], " channel", calib_channel, "###")
             bagfilename = calib_channels[calib_channel]
             # read the bag file
-            [sensor_name, ref_raw_vec, raw_vec] = read_calib(bagfilename, args.topic, data_channel, ref_channel, input_range_max)
+            [sensor_name, ref_raw_vec, raw_vec] = read_calib(
+                bagfilename, args.topic, data_channel, ref_channel, input_range_max)
             if (len(raw_vec) == 0 or len(ref_raw_vec) == 0):
                 print("no data retrieved, check topic name ")
                 continue
-            
+
             mapping_dict = process(ref_raw_vec, raw_vec, calib_channel, data_channel,
-                          ref_channel, args.ref_ratio, args.ref_offset, args.ref_tare_val, args.ref_is_raw,
-                          input_range_max, args.segments, args.no_extrapolation, args.plot)
-            
+                                   ref_channel, args.ref_ratio, args.ref_offset, args.ref_tare_val, args.ref_is_raw,
+                                   input_range_max, args.segments, args.no_extrapolation, args.plot)
+
             if mapping_dict is not None:  # no error
                 # 6. Save
                 # a    Save Lookuptable and-or Model in TaxelCalibrationMapping file.
                 print("Preparing mapping for cell", calib_channel)
                 save_mapping(mapping_dict, calib_channel, sensor_name, args.mapping_file, args.output_csv)
-    
+
     else:  # single number
         calib_channel = calib_channels
         # read the bag file
@@ -88,9 +89,9 @@ if __name__ == "__main__":
             print("no data retrieved, check topic name ")
 
         mapping_dict = process(ref_raw_vec, raw_vec, calib_channel, data_channel,
-                ref_channel, args.ref_ratio, args.ref_offset, args.ref_tare_val, args.ref_is_raw,
-                input_range_max, args.segments, args.no_extrapolation, args.plot)
-                
+                               ref_channel, args.ref_ratio, args.ref_offset, args.ref_tare_val, args.ref_is_raw,
+                               input_range_max, args.segments, args.no_extrapolation, args.plot)
+
         if mapping_dict is not None:  # no error
             # 6. Save
             # a    Save Lookuptable and-or Model in TaxelCalibrationMapping file.

@@ -1,4 +1,8 @@
 from __future__ import print_function
+from tactile_calibration_tools.mapping_utils import *
+import os
+from datetime import datetime
+from matplotlib import pyplot as plt
 
 import rosbag
 from tactile_msgs.msg import TactileState
@@ -8,15 +12,11 @@ from collections import OrderedDict
 #import matplotlib.backends.backend_qt5agg
 import matplotlib
 matplotlib.use('TkAgg')
-from matplotlib import pyplot as plt
-
-from datetime import datetime
-import os
-from tactile_calibration_tools.mapping_utils import *
 
 
 REF_FLAT_THRESHOLD = 0.3  # in newton (30 gram) accepatable variation to find the flat part of the ref
 CHANGE_DETECT_THRESH = 4  # 5 unit of velocity positive or negative
+
 
 def find_inflection_index(x, change_detection_threshold=4):
     direction = 0  # check for any change
@@ -187,6 +187,7 @@ def process(ref_raw_vec, raw_vec, calib_channel, data_channel, ref_channel, ref_
 
     return mapping_dict
 
+
 def get_push_release(raw, ref, change_detect_threshold, doplot=False):
     # TODO Guillaume : also look at the range of ref data to not get a decreasing force at the end of the increasing raw data
     # smooth the data to avoid derivate sign change on noise
@@ -220,11 +221,10 @@ def get_push_release(raw, ref, change_detect_threshold, doplot=False):
         plt.xlabel('Samples')
         plt.ylabel('Ref')
         plt.legend(["Reference"])
-        
-      
+
         mngr = plt.get_current_fig_manager()
-        #mngr.window.geometry('600x400+0+0')
-    
+        # mngr.window.geometry('600x400+0+0')
+
         plt.show(block=False)
 
     return [inc_idx, dec_idx]
@@ -287,9 +287,9 @@ def generate_lookup(raw, ref, inc_idx, dec_idx, input_range_max, doplot=False):
         plt.ylabel('Ref')
         plt.xlabel('Raw')
         plt.legend(["Pushing", "Releasing"])
-        
+
         mngr = plt.get_current_fig_manager()
-        #mngr.window.geometry('500x300+0+400')
+        # mngr.window.geometry('500x300+0+400')
 
         plt.show(block=False)
 
@@ -375,6 +375,7 @@ def get_channels(user_data_channel, user_ref_channel, bagfilename):
                         ref_channel = 1
     return [calib_channel, data_channel, ref_channel]
 
+
 def concatenate_raw_ref(msg, ref_raw_vec, raw_vec, sensor_names, data_channel, ref_channel, input_range_max=1024, warned_size_tactile_vec=False):
     # if there is data
     if len(msg.sensors):
@@ -399,7 +400,8 @@ def concatenate_raw_ref(msg, ref_raw_vec, raw_vec, sensor_names, data_channel, r
                 return -1
         # else drop the data of this message
     return 0
-    
+
+
 def read_calib(bagfilename, user_topic, data_channel, ref_channel, input_range_max=1024):
 
     bag = rosbag.Bag(bagfilename)
@@ -410,23 +412,25 @@ def read_calib(bagfilename, user_topic, data_channel, ref_channel, input_range_m
     print("Reading", bagfilename, " looking for ", user_topic, "channel", data_channel, " and ref ", ref_channel)
     warned_size_tactile_vec = False
     for topic, msg, t in bag.read_messages(topics=[user_topic]):
-        ret = concatenate_raw_ref(msg, ref_raw_vec, raw_vec, sensor_names, data_channel, ref_channel, input_range_max, warned_size_tactile_vec)
+        ret = concatenate_raw_ref(msg, ref_raw_vec, raw_vec, sensor_names, data_channel,
+                                  ref_channel, input_range_max, warned_size_tactile_vec)
         if ret == -1:
             break
     bag.close()
     return [sensor_names[0], ref_raw_vec, raw_vec]
+
 
 def generate_mapping_pwl(x, y, input_range_max, calib_channel, seg=4, no_extrapolation=False, doplot=False):
     try:
         import pwlf
     except ModuleNotFoundError:
         print('Missing PWL functions. Ensure that it is installed according to the instructions here: \n'
-                  '  https://github.com/cjekel/piecewise_linear_fit_py#installation')
+              '  https://github.com/cjekel/piecewise_linear_fit_py#installation')
         exit(-1)  # raise makes the message not appear
-        
+
     except ImportError as e:
         print('Ensure that it is installed according to the instructions here: \n'
-                  '  https://github.com/cjekel/piecewise_linear_fit_py#installation',)
+              '  https://github.com/cjekel/piecewise_linear_fit_py#installation',)
         exit(-1)  # raise makes the message not appear
 
     xs = np.array(x)
@@ -452,8 +456,8 @@ def generate_mapping_pwl(x, y, input_range_max, calib_channel, seg=4, no_extrapo
         plt.legend(["Pushing data", "PWL Mapping"])
 
         mngr = plt.get_current_fig_manager()
-        #mngr.window.geometry('500x300+0+800')
-    
+        # mngr.window.geometry('500x300+0+800')
+
         plt.show(block=False)
 
     # with open('lookup_inc.csv', 'w') as csvfile:
