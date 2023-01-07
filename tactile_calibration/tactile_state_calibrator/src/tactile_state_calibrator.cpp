@@ -325,6 +325,7 @@ void TactileStateCalibrator::tactile_state_cb(const tactile_msgs::TactileStateCo
 
 bool TactileStateCalibrator::tare_cb(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &resp)
 {
+	(void)req;  // fixes unused parameter warning
 	if (tare_requested_) {
 		resp.success = false;
 		resp.message = "tare ongoing";
