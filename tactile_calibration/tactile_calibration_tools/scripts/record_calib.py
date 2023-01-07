@@ -307,7 +307,7 @@ if __name__ == "__main__":
    # execute only if run as a script
     parser = argparse.ArgumentParser()
 
-    # args : 1 bagfilename, 2 topic, sensor number, calib number
+    # args : 1 bagfilename, 2 topic, sensor number, calib numberoutput_folder
     parser.add_argument("raw_topic", type=str,
                         help="raw topic to record")
     parser.add_argument("ref_channel", type=int,
@@ -326,6 +326,10 @@ if __name__ == "__main__":
                         help="reference ratio (indicated on the tool)")
     parser.add_argument("--ref_offset", type=float, nargs='?', const=REF_CALIB_OFFSET,
                         help="reference offset (indicated on the tool)")
+    parser.add_argument("--recordings_folder", type=str, default="",
+                        help="Where to save recordings")
+    parser.add_argument("--mapping_file", type=str, default="mapping.yaml",
+                        help="Full name where to store the calibration result (will be merged into an existing file)")
     parser.add_argument("--no_tare",  action="store_true", help="deactivate initial tare process")
     parser.add_argument("--plot",  action="store_true", help="show the plots")
     parser.add_argument("--input_resolution", type=int, default=DEFAULT_INPUT_RESOL,
@@ -335,7 +339,7 @@ if __name__ == "__main__":
     parser.add_argument("--record_only",  action="store_true", help="performs only all calibration recordings, keep calibration processing separate")
     args = parser.parse_args()
 
-    rospy.init_node('tactile_calibration_recorder', anonymous=True)
+    rospy.init_node('tactile_calibration_recorder', anonymous=False)
 
     # initialize local vars
     input_range_max = 2**args.input_resolution
@@ -674,7 +678,10 @@ if __name__ == "__main__":
             if len(msgs) and detected_channel is not None:
                 date_time_obj = datetime.now()
                 date_time = date_time_obj.strftime("%Y-%m-%d-%H-%M-%S")
-                save_filename = "calib_" + str(detected_channel) + "_" + date_time + ".bag"
+                if args.recordings_folder is not None:
+                    save_filename = args.recordings_folder + "/calib_" + str(detected_channel) + "_" + date_time + ".bag"
+                else:
+                    save_filename = "calib_" + str(detected_channel) + "_" + date_time + ".bag"
                 saved = save_data(save_filename)
 
                 if saved:
@@ -724,7 +731,7 @@ if __name__ == "__main__":
                 input_range_max = input_range_max = 2**input_resolution
                 segments = DEFAULT_SEGMENTS
                 no_extrapolation = False
-                mapping_file = None
+                mapping_file = args.mapping_file
                 output_csv = False
                 show_plot = True # even if args.plot is false, as visual inspection is the only way to be satisfied with the calib
 
