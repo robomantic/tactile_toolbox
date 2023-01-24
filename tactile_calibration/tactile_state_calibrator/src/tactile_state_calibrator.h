@@ -56,6 +56,10 @@ private:
 	                       const std::shared_ptr<tactile::Calibration> &calib);
 
 	/**
+	 * record or process the tare values
+	 */
+	void process_tare(const tactile_msgs::TactileState &msg, size_t sensor_idx = 0);
+	/**
 	 * generic tactile callback
 	 */
 	void tactile_state_cb(const tactile_msgs::TactileStateConstPtr &msg);
